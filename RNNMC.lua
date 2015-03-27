@@ -16,18 +16,19 @@ trainData, testData, classes = GetTrainAndTestData("./music", .8)
 --Step 2: Create the model
 inp = 128;  -- dimensionality of one sequence element 
 outp = 32; -- number of derived features for one sequence element
-kw = 64;   -- kernel only operates on one sequence element at once
-dw = 32;   -- we step once and go on to the next sequence element
+kw = 8;   -- kernel only operates on one sequence element at once
+dw = 8;   -- we step once and go on to the next sequence element
 spl = 128 -- split constant
 --print(nn)
 mlp=nn.Sequential()
 mlp:add(nn.TemporalConvolution(inp,128,kw,dw))
 --mlp:add(nn.Reshape(inp))
-mlp:add(nn.Sigmoid())
-mlp:add(nn.TemporalMaxPooling(2))
+--mlp:add(nn.Sigmoid())
+mlp:add(nn.TemporalMaxPooling(8))
 
 mlp:add(nn.Linear(128,32))
 mlp:add(nn.ReLU())
+mlp:add(nn.Dropout(.9))
 mlp:add(nn.Linear(32,#classes))
 mlp:add(nn.LogSoftMax())
 --mlp:add(nn.Square())
