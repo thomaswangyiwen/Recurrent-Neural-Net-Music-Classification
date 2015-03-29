@@ -5,7 +5,7 @@ require "optim"
 require "midiToBinaryVector"
 require 'DatasetGenerator'
 require 'lfs'
-
+require 'concatModule/concatmodel'
 
 
 
@@ -14,34 +14,11 @@ trainData, testData, classes = GetTrainAndTestData("./music", .8)
 
 
 --Step 2: Create the model
-inp = 128;  -- dimensionality of one sequence element 
-outp = 32; -- number of derived features for one sequence element
-kw = 8;   -- kernel only operates on one sequence element at once
-dw = 8;   -- we step once and go on to the next sequence element
-spl = 128 -- split constant
---print(nn)
-mlp=nn.Sequential()
-mlp:add(nn.TemporalConvolution(inp,128,kw,dw))
---mlp:add(nn.Reshape(inp))
---mlp:add(nn.Sigmoid())
-mlp:add(nn.TemporalMaxPooling(8))
-
-mlp:add(nn.Linear(128,32))
-mlp:add(nn.ReLU())
-mlp:add(nn.Dropout(.9))
-mlp:add(nn.Linear(32,#classes))
-mlp:add(nn.LogSoftMax())
---mlp:add(nn.Square())
-mlp:add(nn.Sum(1))
-model = mlp
+model = GenerateBagOfClassifiers(#classes)
+print(model)
 
 --Step 3: Defne Our Loss Function
-criterion = nn.ClassNLLCriterion()
-
-
--- classes
---classes = {'Classical','Jazz'}
---Obtained from GetTrainAndTestData
+criterion = nn.MultiMarginCriterion(2)--nn.ClassNLLCriterion()
 
 -- This matrix records the current confusion across classes
 confusion = optim.ConfusionMatrix(classes)
@@ -51,9 +28,14 @@ print(confusion)
 trainLogger = optim.Logger(paths.concat('.', 'train.log'))
 testLogger = optim.Logger(paths.concat('.', 'test.log'))
 
+
+parameters = {}
+gradParameters = {}
 -- Retrieve parameters and gradients:
 -- this extracts and flattens all the trainable parameters of the mode
 -- into a 1-dim vector
+-- Update we now need to capture all gradients with inside the model......
+print("TEST_SEARCH")
 if model then
    parameters,gradParameters = model:getParameters()
 end
@@ -68,10 +50,6 @@ optimState = {
     learningRateDecay = 5e-7
 }
 optimMethod = optim.sgd
---print(torch.randperm(11))
-
-
-
 
 epoch = 1
 batch_size = 32
@@ -85,7 +63,7 @@ function train()
 
    -- set model to training mode (for modules that differ in training and testing, like Dropout)
    model:training()
-   --print(#trainData)
+
    -- shuffle at each epoch
    shuffle = torch.randperm(trainData:size())
 
@@ -106,10 +84,6 @@ function train()
       targets[s] = trainData.Labels[shuffle[t+s]]
       end  
         
-        
-    --print(inputs)
-    -- print(targets)
-
       -- create closure to evaluate f(X) and df/dX
       local feval = function(x)
                        -- get new parameters
@@ -123,28 +97,23 @@ function train()
                        -- f is the average of all criterions
                        local f = 0
                        local spl_counter = 0
-                       --print("Evaluating mini-batch")
+
                        -- evaluate function for complete mini batch
                        for i = 1,#inputs do
                      
                           spl_counter  = spl_counter+1
-                          --print(inputs[i]:size())
-                          --print(splitted[j])
                           local output = model:forward(inputs[i])
-                      
-                          --print("Calculating error")
-                          --print(output:size())
-                          --print(targets[i])
+                          --output = torch.Tensor(output)
                           local err = criterion:forward(output, targets[i])
+                          --print(err)
                           f = f + err
 
-                          
+                          --print(output)
                           -- estimate df/dW
                           local df_do = criterion:backward(output, targets[i])
                           model:backward(inputs[i], df_do)
 
                           -- update confusion
-                        --if (j % 3) then
                           confusion:add(output, targets[i])
                         --end
                        --end
@@ -153,20 +122,12 @@ function train()
                        -- normalize gradients and f(X)
                        gradParameters:div(spl_counter)
                        f = f/spl_counter
-                       --print(spl_counter)
-                       --print("Returning from feval")
+
                        -- return f and df/dX
                        return f,gradParameters
                     end
-
-                   --config = {learningRate = 0.003, weightDecay = 0.01, 
-      ---momentum = 0.01, learningRateDecay = 5e-7}
-        --print("Before optim.sgd")
         optim.sgd(feval, parameters, optimState)
-        --print("After optim.sgd")
    end
-
-    --print("Before taking time")
     
    -- time taken
    time = sys.clock() - time
@@ -193,34 +154,6 @@ function train()
    confusion:zero()
    epoch = epoch + 1
 end
-train()
-
-
-
-
-getClass = function(preds,target,confusion)
-local c = {}
-c[1] = 0
-c[2] = 0
-c[3] = 0
-for i = 1,#preds
-    do 
-        local m = preds[i][1]
-        local current = 1
-        for j=2,3
-        do
-            if(preds[i][j] > m)
-            then
-                current = j
-            end
-        end
-        c[current] = c[current] + 1
-    end
---print(c)
---print(target)
-end
-
-
 
 
 function test()
@@ -289,11 +222,9 @@ function test()
    confusion:zero()
 end
 
-
-
+--print(torch.randperm(11))
 
 for i = 1, 100 do
     train()
     test()
 end
-
