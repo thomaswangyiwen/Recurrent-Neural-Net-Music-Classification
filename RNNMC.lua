@@ -1,12 +1,12 @@
 local torch = require 'torch'
-local nn = require "nn"
+
 local midi = require 'MIDI'
 require "optim"
 require "midiToBinaryVector"
 require 'DatasetGenerator'
 require 'lfs'
-
-
+require 'nnx'
+local nn = require "nn"
 
 
 --Step 1: Gather our training and testing data - trainData and testData contain a table of Songs and Labels
@@ -16,34 +16,56 @@ trainData, testData, classes = GetTrainAndTestData("./music", .8)
 --Step 2: Create the model
 inp = 128;  -- dimensionality of one sequence element 
 outp = 32; -- number of derived features for one sequence element
-kw = 4;   -- kernel only operates on one sequence element at once
-dw = 4;   -- we step once and go on to the next sequence element
+kw = 8;   -- kernel only operates on one sequence element at once
+dw = 8;   -- we step once and go on to the next sequence element
 spl = 64 -- split constant
 --print(nn)
 mlp=nn.Sequential()
 mlp:add(nn.TemporalConvolution(inp,128,kw,dw))
 --mlp:add(nn.Reshape(inp))
 mlp:add(nn.Tanh())
-mlp:add(nn.TemporalMaxPooling(4))
+mlp:add(nn.TemporalMaxPooling(8))
 
-mlp:add(nn.TemporalConvolution(inp,128,4,4))
+--mlp:add(nn.TemporalConvolution(inp,128,4,4))
 --mlp:add(nn.Reshape(inp))
-mlp:add(nn.Tanh())
-mlp:add(nn.TemporalMaxPooling(2))
+--mlp:add(nn.Tanh())
+--mlp:add(nn.TemporalMaxPooling(2))
 
-mlp:add(nn.Linear(128,32))
+mlp:add(nn.Linear(128,64))
 --mlp:add(nn.Dropout(.2))
 mlp:add(nn.Tanh())
-mlp:add(nn.Linear(32,16))
+mlp:add(nn.Linear(64,32))
 
 --mlp:add(nn.Square())
 mlp:add(nn.Sum())
 mlp:add(nn.ReLU())
-mlp:add(nn.Linear(16,#classes))
-mlp:add(nn.LogSoftMax())
+--mlp:add(nn.Linear(16,#classes))
+--mlp:add(nn.LogSoftMax())
 
-model = mlp
+--r = mlp
 
+inpMod = nn.Linear(16,16)
+rho = 10
+r = nn.Recurrent(
+   32, mlp, 
+   nn.Linear(32, 32), nn.Tanh(), 
+   rho
+)
+
+model = nn.Sequential()
+--model:add(mlp)
+model:add(r)
+--model:add(nn.Reshape(1,40))
+model:add(nn.Linear(32,#classes))
+--model:add(nn.Sum())
+model:add(nn.LogSoftMax())
+--model:get(1):forget()
+d = torch.randn(10000,128)
+--e = torch.randn(100,128)
+--print(d[1])
+print(mlp:forward(d))
+--print(model:forward(e))
+--return
 --Step 3: Defne Our Loss Function
 criterion = nn.ClassNLLCriterion()
 
@@ -71,7 +93,7 @@ end
 
 
 optimState = {
-    learningRate = 0.003,
+    learningRate = 0.001,
     weightDecay = 0.01,
     momentum = .01,
     learningRateDecay = 1e-7
@@ -83,7 +105,7 @@ optimMethod = optim.sgd
 
 
 epoch = 1
-batch_size = 32
+batch_size = 10
 function train()
 
    -- epoch tracker
@@ -100,7 +122,7 @@ function train()
 
     
    for t = 1, trainData:size(),batch_size do
-   
+      --print(t) 
       xlua.progress(t, trainData:size())  
       local inputs = {}
       
@@ -139,8 +161,9 @@ function train()
                           spl_counter  = spl_counter+1
                           --print(inputs[i]:size())
                           --print(splitted[j])
+                          --print(inputs[i]:size())
                           local output = model:forward(inputs[i])
-                      
+                         --print(output:size()) 
                           --print("Calculating error")
                           --print(output:size())
                           --print(targets[i])
@@ -150,7 +173,9 @@ function train()
                           
                           -- estimate df/dW
                           local df_do = criterion:backward(output, targets[i])
-                          model:backward(inputs[i], df_do)
+                          --print(df_do)
+                          --print(inputs[i]:size())
+                          model:backward(inputs[i]:double(), df_do)
 
                           -- update confusion
                         --if (j % 3) then
@@ -172,6 +197,8 @@ function train()
       ---momentum = 0.01, learningRateDecay = 5e-7}
         --print("Before optim.sgd")
         optim.sgd(feval, parameters, optimState)
+ 
+        --model:get(1):forget()
         --print("After optim.sgd")
    end
 
@@ -199,6 +226,7 @@ function train()
    torch.save(filename, model)
 
    -- next epoch
+
    confusion:zero()
    epoch = epoch + 1
 end
@@ -263,10 +291,11 @@ function test()
            --                break
              --           end
       local pred = model:forward(input)
-      pred = torch.reshape(pred, #classes)
+      --pred = torch.reshape(pred, #classes)
       --preds[j] = pred
       --sum = sum + pred
       confusion:add(pred, target)
+     -- model:get(1):forget()
       --print (confusion)
       end
       --getClass(preds,target,confusion)
@@ -293,7 +322,8 @@ function test()
       -- restore parameters
       parameters:copy(cachedparams)
    end
-   
+    
+   model:get(1):forget()
    -- next iteration:
    confusion:zero()
 end
@@ -301,7 +331,7 @@ end
 
 
 
-for i = 1, 400 do
+for i = 1, 1000 do
     train()
     test()
 end
