@@ -10,9 +10,9 @@ require 'lfs'
 
 
 --Step 1: Gather our training and testing data - trainData and testData contain a table of Songs and Labels
-trainData, testData, classes = GetTrainAndTestData("./music", .8)
+trainData, testData, classes = GetTrainAndTestData("./sMusic", .8)
 
-
+--[[
 --Step 2: Create the model
 inp = 128;  -- dimensionality of one sequence element 
 outp = 32; -- number of derived features for one sequence element
@@ -41,7 +41,7 @@ mlp:add(nn.Sum())
 mlp:add(nn.ReLU())
 mlp:add(nn.Linear(128,#classes))
 mlp:add(nn.Tanh())
-
+--]]
 model = mlp
 
 --- Richards model
