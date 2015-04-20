@@ -10,7 +10,7 @@ require 'lfs'
 
 
 --Step 1: Gather our training and testing data - trainData and testData contain a table of Songs and Labels
-trainData, testData, classes = GetTrainAndTestData("./sMusic", .8)
+trainData, testData, classes = GetTrainAndTestData("./music", .8)
 
 --[[
 --Step 2: Create the model
@@ -49,15 +49,15 @@ model = nn.Sequential()
 --model:add(nn.Reshape(1,128,512))
 model:add(nn.SpatialContrastiveNormalization(2,image.gaussian1D(5)))
 model:add(nn.SpatialConvolution(2, 6, 5, 5))
-model:add(nn.SpatialMaxPooling(2,2,2,2))
-model:add(nn.SpatialConvolution(6, 16, 5,5))
-model:add(nn.SpatialMaxPooling(2,2,2,2))
-model:add(nn.View(16 * 125 * 29))
-model:add(nn.Linear(16 * 125 * 29, 256))
-model:add(nn.PReLU())
-model:add(nn.Dropout(0.2))
-model:add(nn.Linear(256, #classes))
-model:add(nn.PReLU())
+model:add(nn.SpatialMaxPooling(4,4,4,4))
+
+--16 layers, 30x125 image
+model:add(nn.View(6 * 31 * 127))
+model:add(nn.Linear(6 * 31 * 127, 25))
+model:add(nn.Dropout(0.7))
+model:add(nn.Tanh())
+model:add(nn.Linear(25, #classes))
+model:add(nn.Tanh())
 model:add(nn.LogSoftMax())
 
 --Step 3: Defne Our Loss Function
@@ -87,8 +87,8 @@ end
 
 
 optimState = {
-    learningRate = 0.003,
-    weightDecay = 0.01,
+    learningRate = 0.03,
+    weightDecay = 0.05,
     momentum = .01,
     learningRateDecay = 1e-7
 }
@@ -212,7 +212,7 @@ function train()
    local filename = paths.concat('.', 'model.net')
    os.execute('mkdir -p ' .. sys.dirname(filename))
    print('==> saving model to '..filename)
-   torch.save(filename, model)
+   --torch.save(filename, model)
 
    -- next epoch
    confusion:zero()
