@@ -15,7 +15,7 @@ local math = require 'math'
 trainData = {}
 testData = {}
 classes = {}
-trainData, testData, classes = GetTrainAndTestData("./sMusic", .8)
+trainData, testData, classes = GetTrainAndTestData("./music", .8)
 
 
 
@@ -27,20 +27,24 @@ print(trainData.Labels[1])
 -- This Describes the default model to be generate for classification.
 DefaultModel = function(num_output)
 
---Best NN so far
-mlp = nn.Sequential()
-mlp:add(nn.SpatialContrastiveNormalization(2,image.gaussian1D(5)))
-mlp:add(nn.SpatialConvolution(2, 6, 5, 5))
-mlp:add(nn.SpatialMaxPooling(2,2,2,2))
+	--Best NN so far
+	mlp = nn.Sequential()
+	--mlp:add(nn.SpatialContrastiveNormalization(2,image.gaussian1D(5)))
+	--mlp:add(nn.SpatialConvolution(2, 2, 5, 5))
+	--mlp:add(nn.SpatialMaxPooling(2,2,2,2))
 
---16 layers, 30x125 image
-mlp:add(nn.View(6 * 62 * 254))
-mlp:add(nn.Linear(6 * 62 * 254, 300))
-mlp:add(nn.Dropout(0.5))
-mlp:add(nn.Tanh())
-mlp:add(nn.Linear(300,2))
-mlp:add(nn.LogSoftMax())
-  
+	--mlp:add(nn.SpatialContrastiveNormalization(4,image.gaussian1D(5)))
+	--mlp:add(nn.SpatialConvolution(4, 4, 5, 5))
+	--mlp:add(nn.SpatialMaxPooling(2,2,2,2))
+	
+	--16 layers, 30x125 image
+	mlp:add(nn.View(2*1000*128))
+	mlp:add(nn.Linear(2*1000*128, 25))
+	mlp:add(nn.Dropout(.1))
+	mlp:add(nn.Tanh())
+	mlp:add(nn.Linear(25, 2))
+	mlp:add(nn.LogSoftMax())
+
 	return mlp
 end
 
@@ -72,8 +76,8 @@ gradParameters = {}
 for i=1,#classes
 do
     confusions[i] = optim.ConfusionMatrix({classes[i], "Not "..classes[i]})
-    --trainLoggers[i] = optim.Logger(paths.concat('.', 'train'..classes[i]..'.log'))
-    --testLoggers[i] = optim.Logger(paths.concat('.', 'test'..classes[i]..'.log'))
+    trainLoggers[i] = optim.Logger(paths.concat('.', 'train'..classes[i]..'.log'))
+    testLoggers[i] = optim.Logger(paths.concat('.', 'test'..classes[i]..'.log'))
     --print(confusions[i])
 
     if models[i] then
@@ -90,7 +94,7 @@ end
 
 
 optimState = {
-    learningRate = 0.01,
+    learningRate = 0.001,
     weightDecay = 0.001,
     momentum = 0.001,
     learningRateDecay = 5e-7
@@ -126,7 +130,7 @@ function train()
             end
             
             --if 1 == 1 then
-            if math.fmod(SkipCounter[modelIndex],#classes) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
+            if math.fmod(SkipCounter[modelIndex],#classes-1) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
                local inputs = {}
                table.insert(inputs, trainData.Songs[shuffle[t]])
 
@@ -147,12 +151,9 @@ function train()
 
                            -- f is the average of all criterions
                            local f = 0
-                           local spl_counter = 0
 
                            -- evaluate function for complete mini batch
                            for i = 1,#inputs do
-
-                              spl_counter  = spl_counter+1
 
 			--print("Calculating output")
 			--print("Input: ", inputs[i])
@@ -167,9 +168,9 @@ function train()
                            end
 
                            -- normalize gradients and f(X)
-                           gradParameters[modelIndex]:div(spl_counter)
-                            f = f/spl_counter
-                            current_loss = current_loss/ spl_counter
+                           gradParameters[modelIndex]:div(#inputs)
+                            f = f/#inputs
+
                            return f,gradParameters[modelIndex]
                 end
                 optim.sgd(feval, parameters[modelIndex], optimState)              
@@ -188,12 +189,13 @@ function train()
            print(confusions[modelIndex])
 
            -- update logger/plot
-           --trainLoggers[modelIndex]:add{['% mean class accuracy (train set)'] = confusions[modelIndex].totalValid * 100}
-           --if true then
-           --   trainLoggers[modelIndex]:style{['% mean class accuracy (train set)'] = '-'}
-              --trainLoggers[modelIndex]:plot()
-           --end
-
+--[[
+           trainLoggers[modelIndex]:add{['% mean class accuracy (train set)'] = confusions[modelIndex].totalValid * 100}
+           if true then
+              trainLoggers[modelIndex]:style{['% mean class accuracy (train set)'] = '-'}
+              trainLoggers[modelIndex]:plot()
+           end
+--]]
            -- save/log current net
            --local filename = paths.concat('.', 'model'..modelIndex..'.net')
            --os.execute('mkdir -p ' .. sys.dirname(filename))
@@ -206,7 +208,7 @@ function train()
            end
 end
 current_loss = 0
-train()
+--train()
 
 
 function test()
@@ -250,7 +252,7 @@ function test()
        --testLoggers[i]:add{['% mean class accuracy (test set)'] = confusions[i].totalValid * 100}
        --if true then
        --   testLoggers[i]:style{['% mean class accuracy (test set)'] = '-'}
-          --testLoggers[i]:plot()
+       --   testLoggers[i]:plot()
        --end
 
        if average then
@@ -262,86 +264,24 @@ function test()
        confusions[i]:zero()   
     end     
 end
-test()
+--test()
 
-
-
-
-
-
-
-function train_joined()
-
-
-
-end
-
-
-function test_joined()
-   -- local vars
-   local time = sys.clock()
-
-    for i=1, #classes do
-       if average then
-          cachedparams = parameters[i]:clone()
-          parameters[i]:copy(average)
-       end
-
-       -- set model to evaluate mode (for modules that differ in training and testing, like Dropout)
-       models[i]:evaluate()
-      print(testData:size())
-       -- test over test data
-       print('==> testing on test set:')
-       for t = 1,testData:size() do
-          -- disp progress
-          xlua.progress(t, testData:size())
-
-          -- get new sample
-          local input = testData.Songs[t]
-          --input = input:double()
-          local target = 2
-          if testData.Labels[t] == i then target = 1 end
-              --if target == 0 then target = 2 end
-
-              local pred = models[i]:forward(input)
-              --pred = torch.reshape(pred, 2)
-              confusions[i]:add(pred, target)
-      end
-       time = sys.clock() - time
-       time = time / testData:size()
-       print("\n==> time to test 1 sample = " .. (time*1000) .. 'ms')
-
-       -- print confusion matrix
-       print(confusions[i])
-
-       -- update log/plot
-       --testLoggers[i]:add{['% mean class accuracy (test set)'] = confusions[i].totalValid * 100}
-       --if true then
-       --   testLoggers[i]:style{['% mean class accuracy (test set)'] = '-'}
-          --testLoggers[i]:plot()
-       --end
-
-       if average then
-          -- restore parameters
-          parameters[i]:copy(cachedparams)
-       end
-
-       -- next iteration:
-       confusions[i]:zero()   
-    end     
-end
-test()
-
-
-
-
-for i = 1, 100 do
+for i = 1, 10 do
     print("Epoch: ", i)
     train()
     if math.fmod(i,2) == 0 then
         test()
     end
 end
+
+
+-- save/log current net
+local filename = paths.concat('.', 'model.net')
+os.execute('mkdir -p ' .. sys.dirname(filename))
+print('==> saving model to '..filename)
+torch.save(filename, models)
+
+
 
 
 print(classes)
