@@ -1,12 +1,12 @@
 local torch = require 'torch'
-local nn = require "nn"
+nn = require "nn"
 require "nn"
 require "optim"
 require 'DatasetGenerator'
 require 'lfs'
 local math = require 'math'
 
-
+require 'cunn'
 
 ----------------------------------GATHER DATA----------------------------------
 --Get Data
