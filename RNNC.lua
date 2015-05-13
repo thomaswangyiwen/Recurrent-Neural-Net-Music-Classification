@@ -1,11 +1,24 @@
 local torch = require 'torch'
-local nn = require "nn"
+require "nn"
 local midi = require 'MIDI'
 require "nn"
 require "optim"
 require "midiToBinaryVector"
 require 'DatasetGenerator'
 require 'lfs'
+
+cuda = false
+if arg[1] == "cuda"
+then
+	cuda = true
+end
+
+if cuda
+then
+	print("CUNN")
+	require 'cunn'
+end
+
 local math = require 'math'
 
 
@@ -24,6 +37,16 @@ print(classes)
 print(trainData.Labels[1])
 
 
+Cudaify = function (mlp)
+	mlp:cuda()
+	local model = nn.Sequential()
+	model:add(nn.Reshape(2*500*128))
+	model:add(nn.Copy('torch.FloatTensor', 'torch.CudaTensor'))
+	model:add(mlp)
+	model:add(nn.Copy('torch.CudaTensor', 'torch.FloatTensor'))
+	return model
+end
+
 -- This Describes the default model to be generate for classification.
 DefaultModel = function(num_output)
 
@@ -38,7 +61,10 @@ DefaultModel = function(num_output)
 	--mlp:add(nn.SpatialMaxPooling(2,2,2,2))
 	
 	--16 layers, 30x125 image
+        if not cuda then
+        print("view")
 	mlp:add(nn.View(2*500*128))
+        end
 	mlp:add(nn.Linear(2*500*128, 500))
 	mlp:add(nn.Dropout(.1))
 	mlp:add(nn.Tanh())
@@ -47,9 +73,15 @@ DefaultModel = function(num_output)
 	mlp:add(nn.Tanh())
 	mlp:add(nn.Linear(50, 2))
 	mlp:add(nn.LogSoftMax())
-
+ 
+        if(cuda) then
+		--mlp:cuda()
+        	mlp = Cudaify(mlp)         
+        end
+        print(mlp)
 	return mlp
 end
+
 
 
 -- Generating a bag of classifiers -- of default model type
