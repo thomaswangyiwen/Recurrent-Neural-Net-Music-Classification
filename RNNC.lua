@@ -1,11 +1,11 @@
 local torch = require 'torch'
 require "nn"
 local midi = require 'MIDI'
-require "nn"
 require "optim"
 require "midiToBinaryVector"
 require 'DatasetGenerator'
 require 'lfs'
+require 'math'
 
 cuda = false
 if arg[1] == "cuda"
@@ -28,7 +28,7 @@ local math = require 'math'
 trainData = {}
 testData = {}
 classes = {}
-trainData, testData, classes = GetTrainAndTestData("./music", .8)
+trainData, testData, classes = GetTrainAndTestData("./music", .5)
 
 
 
@@ -65,13 +65,13 @@ DefaultModel = function(num_output)
         print("view")
 	mlp:add(nn.View(2*500*128))
         end
-	mlp:add(nn.Linear(2*500*128, 100))
-	mlp:add(nn.Dropout(.1))
-	mlp:add(nn.Tanh())
-	mlp:add(nn.Linear(100, 50))
-	mlp:add(nn.Dropout(.1))
-	mlp:add(nn.Tanh())
-	mlp:add(nn.Linear(50, 2))
+	mlp:add(nn.Linear(2*500*128, 2))
+	--mlp:add(nn.Dropout(.1))
+	--mlp:add(nn.Tanh())
+	--mlp:add(nn.Linear(100, 50))
+	--mlp:add(nn.Dropout(.1))
+	--mlp:add(nn.Tanh())
+	--mlp:add(nn.Linear(50, 2))
 	mlp:add(nn.LogSoftMax())
  
         if(cuda) then
@@ -156,6 +156,8 @@ function train()
    shuffle = torch.randperm(trainData:size())
 
     for modelIndex = 1, #classes do
+	SkipSize = math.floor((#trainData.Songs - trainData.GenreSizes[modelIndex])/trainData.GenreSizes[modelIndex])
+	print(SkipSize, trainData.GenreSizes[modelIndex], classes[modelIndex])
         SkipCounter[modelIndex] = 0
        for t = 1, trainData:size() do
 
@@ -165,7 +167,7 @@ function train()
             end
             
 --            if 1 == 1 then
-            if math.fmod(SkipCounter[modelIndex],#classes-1) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
+            if math.fmod(SkipCounter[modelIndex],SkipSize) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
                local inputs = {}
                table.insert(inputs, trainData.Songs[shuffle[t]])
 

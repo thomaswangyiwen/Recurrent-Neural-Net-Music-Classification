@@ -58,7 +58,7 @@ midiToBinaryVec = function(filename)
 
     -- get the the total ticks in a midi
     local total_ticks =  midi.score2stats(m)["nticks"]
-    print(total_ticks)
+    --print(total_ticks)
     -- get the number of channels
     numchannels = table.getn(m)
 

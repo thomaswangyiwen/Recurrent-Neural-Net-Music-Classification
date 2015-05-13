@@ -62,9 +62,11 @@ function GatherMidiData(BaseDir)
             do FullFilePath = BaseDir.."/"..directoryName.."/"..filename
                 if string.find(filename, ".mid")
                 then 
-                    
-                    data = midiToBinaryVec(FullFilePath) 
-                    if data ~= nil then
+                    --print(filename)
+		    data = false
+                    data = midiToBinaryVec(FullFilePath)
+
+                    if "userdata" == type(data) and data:size(1) == 2 then
                         fileCounter = fileCounter + 1 
                         obj.Songs[fileCounter] = data
                        --print("DATA: ")
@@ -83,6 +85,7 @@ function GatherMidiData(BaseDir)
 	SongGroupContainer = SongGroupContainer,
 	classes = classes,
 	classifier = classifier
+	
     }
     
     torch.save(SongData_file, SaveData)
@@ -94,24 +97,25 @@ end
 
 
 function SplitMidiData(data, ratio)
-    local trainData = {Labels={}, Songs={}}
-    local testData = {Labels={}, Songs={}}
+    local trainData = {Labels={}, Songs={}, GenreSizes={}}
+    local testData = {Labels={}, Songs={}, GenreSizes={}}
     trainData.size = function() return #trainData.Songs end
     testData.size = function() return #testData.Songs end    
 
 
     TrainingCounter = 0
     TestingCounter = 0
+
     for genreKey,value in pairs(data) do 
         local shuffle = torch.randperm(#data[genreKey].Songs)
         local numTrain = math.floor(shuffle:size(1) * ratio)
         local numTest = shuffle:size(1) - numTrain
-            
+
+	trainData.GenreSizes[classifier[genreKey]] = numTrain
+        testData.GenreSizes[classifier[genreKey]] = numTest           
+ 
         for i=1,numTrain do
           TrainingCounter = TrainingCounter + 1
-          --print(#data[genreKey].Songs)
-          --print(i)
-          --print(genreKey)
           trainData.Songs[TrainingCounter] = data[genreKey].Songs[shuffle[i]]--:transpose(1,2):clone()
           trainData.Labels[TrainingCounter] = classifier[genreKey]
         end
@@ -120,36 +124,14 @@ function SplitMidiData(data, ratio)
             TestingCounter = TestingCounter + 1
             testData.Songs[TestingCounter] = data[genreKey].Songs[shuffle[i]]--:transpose(1,2):clone()
             testData.Labels[TestingCounter] = classifier[genreKey]
-
         end
+        
+
+
     end    
-    
 
 
-
-
-    local shuffledTrainData = {Labels={}, Songs={}}
-    local shuffledTestData = {Labels={}, Songs={}}
-    shuffledTrainData.size = function() return #shuffledTrainData.Songs end
-    shuffledTestData.size = function() return #shuffledTestData.Songs end    
-    --Shuffle all of the data around
-    local shuffle = torch.randperm(TrainingCounter)
-    
-    for i=1, TrainingCounter do
-	shuffledTrainData.Songs[i] = trainData.Songs[shuffle[i]]
-    --print(shuffledTrainData.Songs[i])
-    	--shuffledTrainData.Songs[i] = (trainData.Songs[shuffle[i]] - trainData.Songs[shuffle[i]]:mean())/(trainData.Songs[shuffle[i]]:std())
-	shuffledTrainData.Labels[i] = trainData.Labels[shuffle[i]]
-    end
-
-    local shuffle = torch.randperm(TestingCounter)
-    for i=1, TestingCounter do
-	shuffledTestData.Songs[i] = testData.Songs[shuffle[i]]
-    	--shuffledTestData.Songs[i] = (testData.Songs[shuffle[i]] - testData.Songs[shuffle[i]]:mean())/(testData.Songs[shuffle[i]]:std())
-	shuffledTestData.Labels[i] = testData.Labels[shuffle[i]]
-    end
-
-    return shuffledTrainData, shuffledTestData, classes
+    return trainData, testData, classes
 end
 
 

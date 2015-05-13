@@ -10,8 +10,10 @@ require 'cunn'
 
 ----------------------------------GATHER DATA----------------------------------
 --Get Data
-trainData, testData, classes = GetTrainAndTestData("./music", .8)
+trainData, testData, classes = GetTrainAndTestData("./music", .5)
 
+
+print (testData)
 --Add a Results parameter to trainData and testData
 trainData.Results = {}
 testData.Results = {}
