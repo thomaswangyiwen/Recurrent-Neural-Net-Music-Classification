@@ -77,8 +77,8 @@ midiToBinaryVec = function(filename)
     -- determing the overall array length using total ticks / smallest furation
     
     array_col = total_ticks
-    if total_ticks > 15000 then
-    	array_col = 15000
+    if total_ticks > 30000 then
+    	array_col = 30000
     end
     array_row = 128 -- The number of midis notes, this can be made better.
     f:close()
@@ -122,7 +122,7 @@ midiToBinaryVec = function(filename)
     --binVector2 = torch.Tensor(binVector)
     --print(array_col)
     --print(#binVector)
-    return image.scale(binVector,128,1000)
+    return image.scale(binVector,128,500)
 end
 
 

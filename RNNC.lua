@@ -30,7 +30,7 @@ DefaultModel = function(num_output)
 	--Best NN so far
 	mlp = nn.Sequential()
 	--mlp:add(nn.SpatialContrastiveNormalization(2,image.gaussian1D(5)))
-	--mlp:add(nn.SpatialConvolution(2, 2, 5, 5))
+	--mlp:add(nn.SpatialConvolution(2, 2, 1, 5))
 	--mlp:add(nn.SpatialMaxPooling(2,2,2,2))
 
 	--mlp:add(nn.SpatialContrastiveNormalization(4,image.gaussian1D(5)))
@@ -38,11 +38,14 @@ DefaultModel = function(num_output)
 	--mlp:add(nn.SpatialMaxPooling(2,2,2,2))
 	
 	--16 layers, 30x125 image
-	mlp:add(nn.View(2*1000*128))
-	mlp:add(nn.Linear(2*1000*128, 25))
+	mlp:add(nn.View(2*500*128))
+	mlp:add(nn.Linear(2*500*128, 500))
 	mlp:add(nn.Dropout(.1))
 	mlp:add(nn.Tanh())
-	mlp:add(nn.Linear(25, 2))
+	mlp:add(nn.Linear(500, 50))
+	mlp:add(nn.Dropout(.1))
+	mlp:add(nn.Tanh())
+	mlp:add(nn.Linear(50, 2))
 	mlp:add(nn.LogSoftMax())
 
 	return mlp
@@ -76,8 +79,8 @@ gradParameters = {}
 for i=1,#classes
 do
     confusions[i] = optim.ConfusionMatrix({classes[i], "Not "..classes[i]})
-    trainLoggers[i] = optim.Logger(paths.concat('.', 'train'..classes[i]..'.log'))
-    testLoggers[i] = optim.Logger(paths.concat('.', 'test'..classes[i]..'.log'))
+    --trainLoggers[i] = optim.Logger(paths.concat('.', 'train'..classes[i]..'.log'))
+    --testLoggers[i] = optim.Logger(paths.concat('.', 'test'..classes[i]..'.log'))
     --print(confusions[i])
 
     if models[i] then
@@ -129,7 +132,7 @@ function train()
                 SkipCounter[modelIndex] = SkipCounter[modelIndex] + 1
             end
             
-            --if 1 == 1 then
+--            if 1 == 1 then
             if math.fmod(SkipCounter[modelIndex],#classes-1) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
                local inputs = {}
                table.insert(inputs, trainData.Songs[shuffle[t]])
@@ -276,7 +279,7 @@ end
 
 
 -- save/log current net
-local filename = paths.concat('.', 'model.net')
+local filename = paths.concat('.', 'SNNModel.net')
 os.execute('mkdir -p ' .. sys.dirname(filename))
 print('==> saving model to '..filename)
 torch.save(filename, models)

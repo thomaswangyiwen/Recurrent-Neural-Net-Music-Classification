@@ -16,38 +16,65 @@ trainData, testData, classes = GetTrainAndTestData("./music", .8)
 trainData.Results = {}
 testData.Results = {}
 
+
+
+
+---------------------------------GATHER MODELS---------------------------------
+Models = {}
+
 --Get Single Neural Network Data
-local filename = paths.concat('.', 'model.net')
+local filename = paths.concat('.', 'SNNModel.net')
+SingleModels = torch.load(filename)
+for i=1, #classes do
+	table.insert(Models, SingleModels[i])
+end
 
-models = torch.load(filename)
-print("Loaded Models")
 
---Gather results from running a song through each neural network
+--Add Next Model
+--local filename = paths.concat('.', 'NextModel.net')
+--NextModel = torch.load(filename)
+--table.insert(Models, NextModel)
+
+
+print("Number of Models: ", #Models)
+print("Finished Gathering Models")
+
+
+---------------------------------Concatinate All Outputs of Models---------------------------------
 for songIndex=1, trainData:size() do
-	trainData.Results[songIndex] = torch.Tensor(#classes*2)
+	classOutput = Models[1]:forward(trainData.Songs[songIndex])
+	trainData.Results[songIndex] = classOutput
+	--print("Result Size", #trainData.Results[songIndex])
 
-	for i=1, #models do
-		classOutput = models[i]:forward(trainData.Songs[songIndex])
-		trainData.Results[songIndex][i*2-1] = classOutput[1]
-		trainData.Results[songIndex][i*2] = classOutput[2]
+	for i=2, #Models do
+		classOutput = Models[i]:forward(trainData.Songs[songIndex])
+		--print("classOutput Result Size", #classOutput)
+		trainData.Results[songIndex] = torch.cat(trainData.Results[songIndex], classOutput)
+		--print("Result Size1", #trainData.Results[songIndex])
 	end
 end
+
+--print("Output size", #trainData.Results[2])
+OutputSize = trainData.Results[1]:size(1)
+
+
 
 for songIndex=1, testData:size() do
-	testData.Results[songIndex] = torch.Tensor(#classes*2)
 
-	for i=1, #models do
-		classOutput = models[i]:forward(testData.Songs[songIndex])
-		testData.Results[songIndex][i*2-1] = classOutput[1]
-		testData.Results[songIndex][i*2] = classOutput[2]
+	classOutput = Models[1]:forward(testData.Songs[songIndex])
+	testData.Results[songIndex] = classOutput
+	for i=2, #Models do
+		classOutput = Models[i]:forward(testData.Songs[songIndex])
+		testData.Results[songIndex] = torch.cat(testData.Results[songIndex], classOutput)	
 	end
 end
+
 print("Finished Gathering Data")
 ------------------------------END OF GATHER DATA---------------------------------
 
 
 model = nn.Sequential()
-model:add(nn.Linear(2*#classes, 2500))
+model:add(nn.Linear(OutputSize, 2500))
 model:add(nn.Dropout(0.2))
 model:add(nn.Tanh())
 model:add(nn.Linear(2500,#classes))
@@ -237,7 +264,7 @@ end
 
 
 
-epochs = 20
+epochs = 100
 for i=1, epochs do
     train()
     test()
