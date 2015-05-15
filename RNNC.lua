@@ -28,7 +28,7 @@ local math = require 'math'
 trainData = {}
 testData = {}
 classes = {}
-trainData, testData, classes = GetTrainAndTestData("./music", .5)
+trainData, testData, classes = GetTrainAndTestData("./music", .8)
 
 
 
@@ -65,13 +65,13 @@ DefaultModel = function(num_output)
         print("view")
 	mlp:add(nn.View(2*500*128))
         end
-	mlp:add(nn.Linear(2*500*128, 2))
-	--mlp:add(nn.Dropout(.1))
-	--mlp:add(nn.Tanh())
-	--mlp:add(nn.Linear(100, 50))
-	--mlp:add(nn.Dropout(.1))
-	--mlp:add(nn.Tanh())
-	--mlp:add(nn.Linear(50, 2))
+	mlp:add(nn.Linear(2*500*128, 100))
+	mlp:add(nn.Dropout(.1))
+	mlp:add(nn.Tanh())
+	mlp:add(nn.Linear(100, 50))
+	mlp:add(nn.Dropout(.1))
+	mlp:add(nn.Tanh())
+	mlp:add(nn.Linear(50, 2))
 	mlp:add(nn.LogSoftMax())
  
         if(cuda) then
@@ -130,7 +130,7 @@ end
 
 optimState = {
     learningRate = 0.001,
-    weightDecay = 0.001,
+    weightDecay = 0.1,
     momentum = 0.001,
     learningRateDecay = 5e-7
 }
@@ -166,7 +166,7 @@ function train()
                 SkipCounter[modelIndex] = SkipCounter[modelIndex] + 1
             end
             
---            if 1 == 1 then
+            --if 1 == 1 then
             if math.fmod(SkipCounter[modelIndex],SkipSize) == 0 or trainData.Labels[shuffle[t]] == modelIndex then
                local inputs = {}
                table.insert(inputs, trainData.Songs[shuffle[t]])
